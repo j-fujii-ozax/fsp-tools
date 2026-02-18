@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>WMS商品マスタ変換（出荷依頼データ用）</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; background-color: #fdf6f0; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #d35400; border-bottom: 2px solid #e67e22; padding-bottom: 10px; }
+        .step { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .btn { background: #e67e22; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .btn:hover { background: #d35400; }
+        .btn:disabled { background: #ccc; }
+        .log { margin-top: 20px; font-size: 14px; color: #666; }
+        .note { font-size: 0.9em; color: #555; background: #eee; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>出荷データ⇒WMS商品マスタ変換ツール</h1>
+    <p>「出荷依頼データ.xlsx」を選択して変換ボタンを押してください。</p>
+
+    <div class="step">
+        <input type="file" id="upload" accept=".xlsx, .xls" />
+    </div>
+
+    <button id="convertBtn" class="btn">変換してダウンロード</button>
+
+    <div id="status" class="log"></div>
+
+
+</div>
+
+<script>
+document.getElementById('convertBtn').addEventListener('click', function() {
+    const fileInput = document.getElementById('upload');
+    const status = document.getElementById('status');
+
+    if (!fileInput.files.length) {
+        alert('ファイルを選択してください。');
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            // セルの値が文字列として読み込まれるように設定
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+            
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            // JSON形式に変換。ヘッダーの空白などはそのまま保持
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+            
+            if (jsonData.length === 0) {
+                alert('データが見つかりませんでした。');
+                return;
+            }
+
+            // WMSフォーマットへのマッピング
+            const wmsData = jsonData.map(row => {
+                // キー名はExcelのヘッダー名と完全一致させる必要があります
+                // 「品  名(1)」などスペースの数に注意
+                const shohinCd = row['受注/納№(1)'] || "";
+                const name = String(row['品  名(1)'] || row['品 名(1)'] || ""); // スペース1つ、2つ両方に対応
+                const shortName = name.substring(0, 35);
+
+                return {
+                    "No": "",
+                    "商品CD ※必須": shohinCd,
+                    "商品名称 ※必須": name,
+                    "商品略称 ※必須": shortName,
+                    "ソースCD": "",
+                    "ロット管理フラグ ※必須": "0",
+                    "期限日管理フラグ ※必須": "0",
+                    "期限日逆転防止フラグ ※必須": "0",
+                    "入荷期限日数": "",
+                    "出荷期限日数": "",
+                    "入庫No.マージ区分 ※必須": "01",
+                    "出荷停止フラグ ※必須": "0",
+                    "定点": "",
+                    "在庫管理単位": "BU",
+                    "【在庫最小単位】縦(mm)": "",
+                    "【在庫最小単位】横(mm)": "",
+                    "【在庫最小単位】高さ(mm)": "",
+                    "【在庫最小単位】容積(mm3)": "",
+                    "【在庫最小単位】商品重量(g)": "",
+                    "【在庫最小単位】商品総重量(g)": ""
+                };
+            });
+
+            // 新しいワークブックの作成
+            const newWs = XLSX.utils.json_to_sheet(wmsData);
+            const newWb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(newWb, newWs, "Sheet1");
+
+            // タイムスタンプ作成 (YYYYMMDDHHMM)
+            const now = new Date();
+            const ts = now.getFullYear() +
+                String(now.getMonth() + 1).padStart(2, '0') +
+                String(now.getDate()).padStart(2, '0') +
+                String(now.getHours()).padStart(2, '0') +
+                String(now.getMinutes()).padStart(2, '0');
+
+            const fileName = `商品マスタ一括取込用Excelダウンロード_出荷データ分_${ts}.xlsx`;
+
+            // 出力
+            XLSX.writeFile(newWb, fileName);
+            status.innerText = `処理完了: ${fileName} を保存しました。`;
+
+        } catch (error) {
+            console.error(error);
+            alert('エラーが発生しました。元のExcelファイルの列名（受注/納№(1)、品  名(1)）が正しいか確認してください。');
+        }
+    };
+
+    reader.readAsArrayBuffer(file);
+});
+</script>
+
+</body>
+</html>
