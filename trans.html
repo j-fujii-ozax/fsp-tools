@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS（MPS LOGI）用データ変換ツール</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: "Meiryo", "Yu Gothic", sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            font-size: 20px;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .step {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #eef5fa;
+            border-left: 4px solid #0056b3;
+            border-radius: 4px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #0056b3;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background-color: #004494;
+        }
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+        input[type="file"] {
+            display: block;
+            margin-top: 10px;
+        }
+        .instructions {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #555;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>WMS用 入荷予定・出荷指示データ変換ツール</h1>
+
+    <div class="instructions">
+        <strong>【使用方法】</strong>
+        <ol>
+            <li>「出荷依頼データ.xlsx」のファイルを選択します。</li>
+            <li>「入荷予定一括取込Excelを出力」または「出荷指示一括取込Excelを出力」ボタンをクリックします。</li>
+            <li>変換されたExcelファイルが自動的にダウンロードされますので、WMS（MPS LOGI）に取り込んでください。</li>
+        </ol>
+        ※設備マスタはツール内部に組み込まれているため、別途用意する必要はありません。
+    </div>
+
+    <div class="step">
+        <label for="uploadFile"><strong>1. 「出荷依頼データ.xlsx」をアップロードしてください</strong></label>
+        <input type="file" id="uploadFile" accept=".xlsx, .xls, .csv">
+    </div>
+
+    <div class="step">
+        <strong>2. 変換とダウンロード</strong><br><br>
+        <button id="btnArrival" class="btn btn-success" disabled>「入荷予定一括取込Excel」用変換＆ダウンロード</button>
+        <button id="btnShipping" class="btn btn-warning" disabled>「出荷指示一括取込Excel」用変換＆ダウンロード</button>
+    </div>
+</div>
+
+<script>
+    // 設備マスタデータの組み込み
+    const masterCsvData = `4001,枚葉２号機\n4003,枚葉５号機\n4009,枚葉１号機\n7001,本社CTP１号機\n7002,本社CTP２号機\n7003,市島CTP\n8001,枚葉２号機\n8002,枚葉３号機\n8003,枚葉５号機\n8004,輪転１号機\n8005,輪転５号機\n8006,ＰＯＤモノクロ機\n8007,ＰＯＤカラー機\n8008,大黒印刷\n8009,枚葉１号機\n8101,秀永\n8102,プロム\n8103,新井印刷所\n8104,河村\n8105,広真\n8106,新生印刷\n8107,原多印刷\n8108,東和工業印刷\n8109,ホクシン\n8110,日宣印刷\n8111,大和印刷紙工\n8112,国際印刷工業\n8113,CCG HONANDO\n8114,太成二葉産業\n8115,サンエムカラー\n8116,東光パッケージ\n8201,日本ウェブ印刷\n8202,大興印刷\n8203,ニシハラ印刷\n8204,イシイ\n8205,廣済堂（大阪）\n8206,プリントネット\n8207,アイカ\n8208,竹田印刷\n8209,研精堂\n8210,研精堂（東京）\n8211,小松印刷\n8212,新日本印刷\n8213,寿印刷\n8214,岩岡印刷\n8215,岩岡印刷工業\n8216,ウイルコーポ\n8217,セキ\n8218,ＫＧ情報\n8219,竹田印刷（東京）\n8220,新日本（名古屋）\n8221,大享印刷\n8222,明和商会\n8223,大阪書籍印刷\n8224,ＴＯＰＰＡＮ\n8251,高速オフセット\n8252,一写\n8253,広光印刷\n8254,ムレコミュケ\n8255,シーズクリエイト\n8256,小川印刷\n8257,サンケイ総合\n8258,アート印刷工芸社\n10001,中とじ機\n10020,邦南堂\n10021,日本紙興\n10022,高廣製本\n10023,飯島製本\n10024,オービービー\n10025,(中綴)旭紙工\n10026,キンキ\n10050,一貫堂\n10051,東洋紙工\n10052,広集舎\n10053,渋谷紙工所\n10054,(無線)旭紙工\n10055,岡崎紙工\n10056,トモエ紙工\n10057,平田製本\n10058,白川製本\n10059,田中手帳\n10060,特殊製本研究所\n11001,折１号機\n11002,折２号機（小）\n11003,断裁１号機\n11004,断裁２号機\n11005,セット場\n11011,Ｋｉｍｕｒａ\n11012,森本紙工\n11013,宇野紙工\n11014,東洋紙工\n11015,(折)旭紙工\n11016,トモエ紙工\n11017,菅森紙工\n11018,森田紙工\n11019,宮下製本\n11020,タッグプロセス\n11021,山崎製本紙工\n11040,太成二葉\n11041,松本美術紙化\n11042,箔巧プレス\n11043,関西化工\n11044,高見紙化工所\n11045,精巧社\n11050,北陸紙器\n11051,川田紙工\n11052,ユニオン紙器\n11060,栗田印刷\n11061,三永\n11062,山公\n11063,日月工藝\n11064,ヤマト紙工\n11065,レインボーオフィス\n11066,第一\n11067,リボンワーク\n11068,リボンワーク\n11080,社内パート\n11081,ニューＤＭ\n11082,太陽サービス\n11083,＊＊＊＊＊誠和\n11084,木下商会\n11085,ネクスタ\n11086,ＴＭＳ\n11087,門那シーリング印刷\n11088,イマイ\n11091,(断裁)旭紙工\n11092,(断裁)ヤマト紙工\n11093,(断裁)森本紙工\n11094,藤井紙工所\n11095,共和紙工所\n11101,石川特殊\n11102,ウイングアソシエイツ\n11103,アテナ\n11104,美有起\n11105,やまと印刷\n11106,大阪シーリング\n11107,新大阪シール\n11108,協同工芸社\n11109,モリシタ\n11110,丸昌\n11111,日版プリント\n11112,にぐちアートパッケージ\n11113,美鈴紙業\n11114,コトモ\n11115,マルカワ\n11116,大洋社\n11117,白石封筒\n11118,協和商事\n11119,ナテック\n11120,飛鳥\n11121,コーキ封筒\n11122,東洋化学商会西日本販売\n11123,竹尾\n11124,ゴウダ\n11125,プリントキャリー\n11126,山櫻\n11127,日本紙パルプ商事\n11128,サンメールセンター\n11129,マリヤ画材\n11130,DMソリューションズ\n11131,ティーオーエフ\n11132,泉ケミカル\n11501,中とじ機\n11520,邦南堂\n11521,日本紙興\n11522,高廣製本\n11523,飯島製本\n11524,オービービー\n11525,(中綴)旭紙工\n11526,キンキ\n11527,グラフィッククラフト\n11528,堀越\n11529,日宝綜合製本\n11550,一貫堂\n11551,東洋紙工\n11552,広集舎\n11554,(無線)旭紙工\n11555,岡崎紙工\n11556,トモエ紙工\n11557,平田製本\n11558,白川製本\n11559,田中手帳\n11560,特殊製本研究所\n11561,パイオニアビーピー\n11562,立花製本\n11563,北村製本\n11564,黒川梱包\n11565,大豊産業\n11566,協栄紙工\n11567,丹生紙工\n11568,秀野紙工\n11569,協立製本\n13001,カラー（本社）\n13002,モノクロ（本社）\n13010,カラー（東京）\n14001,梱包場`;
+
+    const equipmentMap = {};
+    masterCsvData.split('\n').forEach(line => {
+        const parts = line.split(',');
+        if (parts.length >= 2) {
+            const code = parts[0].trim();
+            const name = parts[1].trim();
+            if (!equipmentMap[name]) {
+                equipmentMap[name] = code;
+            }
+        }
+    });
+
+    let uploadedData = [];
+
+    function formatDateStr(val, addDays = 0) {
+        if (!val) return '';
+        let d;
+        if (typeof val === 'number') {
+            d = new Date(Math.round((val - 25569) * 86400 * 1000));
+        } else {
+            const cleanVal = String(val).replace(/-/g, '/').split(' ')[0];
+            d = new Date(cleanVal);
+        }
+
+        if (isNaN(d.getTime())) return '';
+
+        if (addDays !== 0) {
+            d.setDate(d.getDate() + addDays);
+        }
+
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}/${mm}/${dd}`;
+    }
+
+    function toStr(val) {
+        if (val === null || val === undefined) return '';
+        return String(val);
+    }
+
+    // ユーザー指定の完全一致ヘッダー配列
+    const arrivalHeaders = [
+        "No.", "予定顧客入荷指示No. ※必須", "仕入先CD  ※必須", "仕入先名称", "仕入先略称", "入荷予定日 ※必須", "処理区分CD ※必須", "在庫区分CD", "預託CD ※必須", "商品CD ※必須", "商品名称", "商品略称", "ソースCD", "予定数 ※必須", "予定倉庫CD", "予定ロケーションCD", "予定ロット", "予定期限日", "予定顧客発注No.", "予備項目１（文字列）", "予備項目２（文字列）", "予備項目３（文字列）", "予備項目１（数値）", "予備項目２（数値）", "予備項目３（数値）"
+    ];
+
+    const shippingHeaders = [
+        "No.", "緊急フラグ ※必須", "顧客出荷指示No ※必須", "納品先CD ※必須", "納品先名称", "納品先略称", "処理区分CD ※必須", "納品予定日", "作業日 ※必須", "出荷日 ※必須", "配送コースCD", "配送コース名称", "納品指定日", "納品時間帯CD", "商品CD ※必須", "商品名称", "商品略称", "ソースCD", "預託CD ※必須", "在庫区分CD ※必須", "指示数 ※必須", "指定ロット", "指定期限日", "指定倉庫CD", "指定ロケーションCD", "届先CD", "届先名称", "届先郵便番号", "届先住所1", "届先住所2", "届先住所3", "届先電話番号", "届先住所補足", "出庫作業メッセージ", "合計金額", "合計消費税", "単価", "金額", "消費税", "予備項目１（文字列）", "予備項目２（文字列）", "予備項目３（文字列）", "予備項目１（数値）", "予備項目２（数値）", "予備項目３（数値）"
+    ];
+
+    document.getElementById('uploadFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array', cellDates: false});
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            uploadedData = XLSX.utils.sheet_to_json(worksheet, {raw: true, defval: ''});
+            
+            if (uploadedData.length > 0) {
+                document.getElementById('btnArrival').disabled = false;
+                document.getElementById('btnShipping').disabled = false;
+                alert('ファイルの読み込みが完了しました。変換ボタンを押してください。');
+            } else {
+                alert('ファイルにデータが見つかりませんでした。');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    // 入荷予定データの作成
+    document.getElementById('btnArrival').addEventListener('click', function() {
+        const arrivalData = uploadedData.map((row, index) => {
+            const nyukoName = toStr(row['入庫先']);
+            const supplierCd = equipmentMap[nyukoName] || '';
+            
+            // 全ての項目を定義（ヘッダー配列と完全一致）
+            return {
+                "No.": index + 1,
+                "予定顧客入荷指示No. ※必須": toStr(row['出荷依頼№']),
+                "仕入先CD  ※必須": supplierCd,
+                "仕入先名称": "",
+                "仕入先略称": "",
+                "入荷予定日 ※必須": formatDateStr(row['出荷指示日'], -1),
+                "処理区分CD ※必須": "01",
+                "在庫区分CD": "",
+                "預託CD ※必須": "Y",
+                "商品CD ※必須": toStr(row['受注/納№(1)']),
+                "商品名称": "",
+                "商品略称": "",
+                "ソースCD": "",
+                "予定数 ※必須": row['数  量(1)'] || row['数量(1)'] || '',
+                "予定倉庫CD": "",
+                "予定ロケーションCD": "",
+                "予定ロット": "",
+                "予定期限日": "",
+                "予定顧客発注No.": "",
+                "予備項目１（文字列）": "",
+                "予備項目２（文字列）": "",
+                "予備項目３（文字列）": "",
+                "予備項目１（数値）": "",
+                "予備項目２（数値）": "",
+                "予備項目３（数値）": ""
+            };
+        });
+
+        exportExcelWithHeaders(arrivalData, arrivalHeaders, '入荷予定一括取込用Excel.xlsx');
+    });
+
+    // 出荷指示データの作成
+    document.getElementById('btnShipping').addEventListener('click', function() {
+        const shippingData = uploadedData.map((row, index) => {
+            const timeStr = toStr(row['必着日時文字']);
+            let timeCd = '';
+            if (timeStr.includes('午前')) timeCd = 'A';
+            else if (timeStr.includes('午後')) timeCd = 'B';
+
+            const postCode = toStr(row['納入先〒']).replace(/-/g, '');
+
+            const msgArray = ['メモ１', 'メモ２', '注意事項１', '注意事項２']
+                .map(key => toStr(row[key]))
+                .filter(val => val !== '');
+            const msgCombined = msgArray.join('／');
+
+            // 全ての項目を定義（ヘッダー配列と完全一致）
+            return {
+                "No.": index + 1,
+                "緊急フラグ ※必須": "0",
+                "顧客出荷指示No ※必須": toStr(row['出荷依頼№']),
+                "納品先CD ※必須": toStr(row['得CODE']),
+                "納品先名称": "",
+                "納品先略称": "",
+                "処理区分CD ※必須": "11",
+                "納品予定日": formatDateStr(row['必着日時']),
+                "作業日 ※必須": formatDateStr(row['出荷指示日']),
+                "出荷日 ※必須": formatDateStr(row['出荷指示日']),
+                "配送コースCD": "",
+                "配送コース名称": "",
+                "納品指定日": formatDateStr(row['必着日時']),
+                "納品時間帯CD": timeCd,
+                "商品CD ※必須": toStr(row['受注/納№(1)']),
+                "商品名称": "",
+                "商品略称": "",
+                "ソースCD": "",
+                "預託CD ※必須": "Y",
+                "在庫区分CD ※必須": "W100",
+                "指示数 ※必須": row['数  量(1)'] || row['数量(1)'] || '',
+                "指定ロット": "",
+                "指定期限日": "",
+                "指定倉庫CD": "",
+                "指定ロケーションCD": "",
+                "届先CD": toStr(row['得CODE']),
+                "届先名称": toStr(row['納入先名称']),
+                "届先郵便番号": postCode,
+                "届先住所1": toStr(row['納入先住所']),
+                "届先住所2": "",
+                "届先住所3": "",
+                "届先電話番号": toStr(row['納入先電話']),
+                "届先住所補足": toStr(row['納入先担当所属、名前']),
+                "出庫作業メッセージ": msgCombined,
+                "合計金額": "",
+                "合計消費税": "",
+                "単価": "",
+                "金額": "",
+                "消費税": "",
+                "予備項目１（文字列）": "",
+                "予備項目２（文字列）": "",
+                "予備項目３（文字列）": "",
+                "予備項目１（数値）": "",
+                "予備項目２（数値）": "",
+                "予備項目３（数値）": ""
+            };
+        });
+
+        exportExcelWithHeaders(shippingData, shippingHeaders, '出荷指示一括取込用Excel.xlsx');
+    });
+
+    // Excel出力用（ヘッダーの順番を配列で強制指定）
+    function exportExcelWithHeaders(data, headers, filename) {
+        if (data.length === 0) return;
+        
+        // ヘッダー配列を直接指定することで、出力順を完全に固定
+        const worksheet = XLSX.utils.json_to_sheet(data, { header: headers });
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+        XLSX.writeFile(workbook, filename);
+    }
+</script>
+
+</body>
+</html>
