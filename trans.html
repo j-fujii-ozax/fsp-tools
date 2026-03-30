@@ -282,7 +282,8 @@ D1,通常`;
     // 入荷予定データ作成ロジック
     // -------------------------
     document.getElementById('btnArrival').addEventListener('click', function() {
-        const arrivalData = arrivalDataContainer.data.map((row) => {
+        // ①まずは仕様通りに全行のデータを生成する
+        let arrivalData = arrivalDataContainer.data.map((row) => {
             const nyukoName = toStr(row['入庫先']);
             const supplierCd = equipmentMap[nyukoName] || 'N001';
             
@@ -319,6 +320,10 @@ D1,通常`;
                 "予備項目３（数値）": ""
             };
         });
+
+        // ②結果データから「商品CD」が空欄の不要行を削除（フィルタリング）する
+        arrivalData = arrivalData.filter(row => row["商品CD ※必須"] !== "");
+
         exportExcelWithHeaders(arrivalData, arrivalHeaders, '入荷予定一括取込用Excel.xlsx');
     });
 
@@ -344,13 +349,13 @@ D1,通常`;
             }
         });
 
-        const shippingData = [];
+        // ①まずは仕様通りに全行のデータを生成する
+        let shippingData = [];
 
         shippingDataContainer.data.forEach((row) => {
             const juchuNo = toStr(row['受注/納№(1)']);
-            
-            // 受注/納№(1)が空欄の行は出力データから除外
-            if (!juchuNo) return;
+
+            // ※ここではスキップ（if (!juchuNo) return;）せずに全行を生成処理へ回す
 
             // 時間帯
             const timeStr = toStr(row['必着日時文字']);
@@ -380,8 +385,20 @@ D1,通常`;
                 }
             }
 
+            // 数量が空欄の場合は「1」をセット
+            let instructionQty = cleanQuantity(row['数  量(1)'] || row['数量(1)']);
+            if (instructionQty === "") {
+                instructionQty = "1";
+            }
+
             // 出庫作業メッセージを100文字でカット
             msgCombined = msgCombined.substring(0, 100);
+
+            // 届先名称を50文字でカット
+            let todokesakiMeisho = toStr(row['納入先名称']);
+            if (todokesakiMeisho.length > 50) {
+                todokesakiMeisho = todokesakiMeisho.substring(0, 50);
+            }
 
             // 配送コースCD
             const haisousha = toStr(row['配送者']);
@@ -408,13 +425,13 @@ D1,通常`;
                 "ソースCD": "",
                 "預託CD ※必須": "Y",
                 "在庫区分CD ※必須": "W100",
-                "指示数 ※必須": cleanQuantity(row['数  量(1)'] || row['数量(1)']),
+                "指示数 ※必須": instructionQty,
                 "指定ロット": "",
                 "指定期限日": "",
                 "指定倉庫CD": "",
                 "指定ロケーションCD": "",
                 "届先CD": toStr(row['得CODE']),
-                "届先名称": toStr(row['納入先名称']),
+                "届先名称": todokesakiMeisho,
                 "届先郵便番号": postCode,
                 "届先住所1": toStr(row['納入先住所']),
                 "届先住所2": "",
@@ -436,6 +453,11 @@ D1,通常`;
             });
         });
         
+        // ②結果データから「商品CD」または「納品先CD」が空欄の不要行を削除（フィルタリング）する
+        shippingData = shippingData.filter(row => {
+            return row["商品CD ※必須"] !== "" && row["納品先CD ※必須"] !== "";
+        });
+
         exportExcelWithHeaders(shippingData, shippingHeaders, '出荷指示一括取込用Excel.xlsx');
     });
 </script>
